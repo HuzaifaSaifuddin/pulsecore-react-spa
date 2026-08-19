@@ -145,6 +145,22 @@ screens for these."
   gate's condition (login, facility choice) is satisfied. `<Navigate>` (declarative, renders as
   part of JSX output) vs. `useNavigate()` (imperative, called in response to an event like a click)
   is the general rule for which redirect mechanism fits which situation.
+- **`async`/`await` and `fetch`**: JS is single-threaded, so I/O must be non-blocking or the whole
+  page would freeze; `fetch` returns a Promise, `await` pauses only the enclosing function until it
+  resolves. `fetch` does **not** reject its Promise on HTTP error statuses (401/404/500) — only on
+  true network failures — so error handling requires explicitly checking `response.ok`/`status`
+  yourself; nothing does it for you. An effect's callback can't be `async` itself (must return
+  nothing or a cleanup function, never a Promise), so data-fetching effects define an inner async
+  function and call it immediately.
+- **Context** (`createContext`/`Provider`/`useContext`) solves prop drilling — a value defined once
+  high in the tree is readable by any descendant via `useContext`, no matter the nesting depth,
+  without every intermediate component forwarding it as a prop. Rails analogue:
+  `ActiveSupport::CurrentAttributes` (`Current.user`), scoped to a component tree instead of a
+  request. A state change inside the `Provider` re-renders the `Provider`, which re-renders every
+  consumer that called `useContext`/a custom wrapper hook around it — automatic propagation, no
+  props passed. (Revisit the deeper "why re-renders propagate" mechanism later with a smaller
+  example if needed — a full prose trace through the real `AuthContext` didn't land well in one
+  shot; the code-typing side of this landed fine, the mechanism explanation needs a lighter touch.)
 - **A layout route can conflate two separate concerns** — gating (should this render at all?) and
   chrome (what shared UI wraps it?) — if written as one component. Splitting them into a pure
   guard route (no UI, just `Outlet` or `<Navigate>`) with a separate nav-rendering shell nested
@@ -171,9 +187,43 @@ Final route shape settled on: pure `RequireAuth` guard (no chrome) → `AppShell
 inside it → `RequireFacility` guard nested inside that — gating and chrome-rendering deliberately
 kept as separate layout routes rather than one conflated component.
 
-Next up: checkpoint 4 (calling the real API) — **blocked** until the Rails sibling repo's API
-surface is confirmed; re-check its `CLAUDE.md` Progress block before starting (it had no Rails app
-generated as of 2026-08-15, must re-verify current state).
+**Checkpoint 4 complete (2026-08-19)** — shared API client + error-parsing utility
+(`src/api/client.js`): one `request()` wrapping `fetch`, always sending `credentials: 'include'`
+and the `Accept`/`Content-Type` headers, normalizing both documented error shapes (`{"error"}` /
+`{"errors"}`) into one `ApiError` class. Real login wired against `POST /users/sign_in`. Caught two
+real cross-repo bugs during this checkpoint, both flagged back to the Rails session rather than
+worked around client-side: (1) Devise/Warden returns a plain-text failure body instead of JSON
+without an explicit `Accept: application/json` header — not just on sign-in, apparently API-wide;
+(2) re-`POST`ing `/users/sign_in` with *invalid* credentials while already holding a valid session
+cookie appears to return the existing session's user without re-validating the submitted
+credentials (Warden likely short-circuits on an already-authenticated session) — not a privilege
+escalation, but misleading; flagged, not yet fixed on either side.
+
+**Checkpoint 5 complete (2026-08-20)** — real `AuthProvider`/`useAuth()` context
+(`src/context/AuthContext.jsx` + `src/context/useAuth.js`, split into two files to satisfy Vite's
+Fast Refresh `react-refresh/only-export-components` rule — a file can only export components for
+reliable hot-reload, so the `useAuth` hook lives separately from the `AuthProvider` component).
+Calls the real `GET /api/v1/me` on boot (added by the Rails session specifically for this, closing
+the gap noted below) and after login; exposes `currentUser`/`currentFacility`/
+`accessibleFacilities`/`isLoggedIn` (derived, not stored)/`checkingSession`/`login()`/`logout()`/
+`setCurrentFacility`. All six consumers (`App`, `Login`, `AuthenticatedLayout`, `LogoutButton`,
+`ChooseFacility`, `RequireFacility`) migrated off prop-drilled `isLoggedIn`/`currentFacility` onto
+`useAuth()` directly — `App.jsx` is now pure route structure. `ChooseFacility` renders real
+`accessibleFacilities` (`.map()` + `key`) instead of the old two hardcoded fake buttons.
+Hit a real `eslint-plugin-react-hooks` false positive (`set-state-in-effect` can't trace `setState`
+calls through a separately-named async function called from an effect, even though they happen
+after a genuine `await` boundary) — fixed with a scoped, commented `eslint-disable-next-line`
+rather than restructuring correct code to satisfy an imperfect static check.
+**Known open gap, not yet built**: mid-session expiry handling — only the boot check currently
+reacts to "not logged in"; a `401` from any *later* API call (session expired/revoked mid-use)
+doesn't yet trigger the same logged-out state. Belongs in `api/client.js` (centralized), not
+per-component. Revisit before or during checkpoint 6's real data-mutating screens.
+
+**Switch signal reached (2026-08-20)**: per the "Switch signal" section above, checkpoints 3-5 are
+now working end-to-end against the real Rails API (routing, guards, real login/logout, real
+`current_facility`/`accessible_facilities` from `/api/v1/me`). Time to tell Huzaifa to switch to
+the Rails repo for ActiveAdmin/OmniAuth, then return here for checkpoint 6 (domain screens) once
+those land.
 
 **Confirmed API contract (pulled 2026-08-17 from sibling repo's CLAUDE.md — that file is the
 source of truth, re-pull if anything here seems stale):**
@@ -200,6 +250,14 @@ source of truth, re-pull if anything here seems stale):**
   `appointments`/`admissions` (facility-scoped via `current_user.default_facility`/
   `accessible_facilities`, any authenticated org member writes, plus `advance_status`/
   `revert_status`/`cancel`/`uncancel` POST actions per record).
+- **`GET /api/v1/me`** (added 2026-08-19, replaces the checkpoint-4 stopgap that probed
+  `GET /api/v1/facilities` for a bare 200-vs-401 signal): the real session-check endpoint brief §5
+  asked for. Authenticated: `200`, `{"user": {...same shape as GET /api/v1/users items...},
+  "current_facility": {"id", "name", "organization_id"} | null, "accessible_facilities": [...same
+  shape as GET /api/v1/facilities items...]}`. Unauthenticated: `401`, `{"error": "<message>"}`.
+  Call this on app boot (and after login) instead of the old probe — it's the real source of truth
+  for `currentUser`/`currentFacility`/`accessibleFacilities` and belongs in a proper auth context
+  provider (checkpoint 5), not ad-hoc `useState` in `App`.
 - **Current-facility enforcement is server-side too**: `GET`/`POST /api/v1/appointments` (and
   admissions) return `409 {"error": "No current facility selected"}` if
   `current_user.default_facility_id` is unset — this repo's client-side facility gate (checkpoint
