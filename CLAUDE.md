@@ -267,3 +267,56 @@ source of truth, re-pull if anything here seems stale):**
 - Full per-endpoint request/response bodies (exact JSON keys, every status code) are documented in
   `~/Ruby/rails/pulse_core/CLAUDE.md` under "Actual API surface as built" — read that section
   directly before building the API client/each screen; this summary is deliberately condensed.
+- **No per-record `GET :id` (show) endpoint exists for any resource** — `patients`,
+  `appointments`, and `admissions` are all index-only (`GET /api/v1/patients`, optionally
+  `?date=` for the other two). A single record's detail comes from the same index payload the
+  list screen already fetched, found client-side by id — never a separate fetch. This matters for
+  routing: an edit/detail screen either receives the full record via router `state` (set by the
+  `<Link>` that navigated there) or re-derives it from an already-loaded list in memory: there is
+  no URL that alone can rehydrate one record after a hard refresh with no state. Consistent across
+  all three resources, not a gap — just how this API was shaped.
+- **No `DELETE` endpoint exists for `patients`, `appointments`, or `admissions`** (only
+  `DELETE /users/sign_out` exists in the whole API) — a real divergence from the Django reference
+  app, which has org_admin-only hard-delete views for all three. The SPA must not build delete
+  affordances for these; `cancel`/`uncancel` are the only "undo" primitives the API exposes for
+  appointments/admissions, and patients have no undo action at all once created.
+- **`patients` is org-scoped, not facility-scoped** — no `current_facility` requirement on any
+  patient endpoint (unlike `appointments`/`admissions`, which 409 without one). Patient screens sit
+  outside the `RequireFacility` guard in the route tree, at the same level as `/choose-facility`.
+
+## Checkpoint 6 build mode (decided 2026-08-28)
+
+Per Huzaifa's explicit choice when asked: **hybrid**. For domain screens going forward —
+- Repetitive, already-learned patterns (plain list/create/edit screens repeating
+  `useState`/`useEffect`/`fetch` he's already written multiple times — e.g. Patients) are built
+  directly by Claude via Write/Edit, referencing the Django app at
+  `~/Python/django/pulse_core` (`templates/base.html` + each app's `templates/<app>/*.html`) for
+  exact markup/Tailwind classes/copy to keep the two apps visually interchangeable per brief §7.
+- Genuinely new concepts (the two-step booking flow's cross-route patient hand-off, the
+  list+detail split-pane's URL-driven selected-item/status-filter/date state,
+  `history`-replace-style pane switching) still go through the snippet-by-snippet hands-on process
+  from [[feedback_show_examples_new_apis]] — small pieces, explained, typed by hand.
+- This does not touch the still-standing rule from that same memory: never invent an unrelated
+  parallel example, and never dump a full new-concept file in one block regardless of which bucket
+  a screen falls into overall — the split is about *whether Claude or Huzaifa types the file*, not
+  about relaxing how new concepts are delivered when it's his turn to type.
+
+**Patients feature done** (list + register/edit form, `src/pages/patients/`): built directly per
+the above. `PatientList` fetches `GET /api/v1/patients` once on mount; `PatientForm` is shared
+between create (`POST`) and edit (`PATCH`), reading the record to edit from router `state` (set by
+`PatientList`'s edit `<Link state={{ patient }}>`) rather than a fetch, since no show endpoint
+exists. Supports the brief's `?next=` inline-registration round-trip (create appends
+`?patient=<id>` to `next`, matching `PatientCreateView.get_success_url` in the Django reference;
+edit returns to `next` bare, matching `PatientUpdateView`) for the two-step booking flow's "create
+patient inline, then continue" case, not yet exercised by a caller until Appointments/Admissions
+booking is built. No delete affordance (API has none — see contract note above). Routed outside
+`RequireFacility` (org-scoped resource). Old placeholder nav pages `About`/`Career` (checkpoint-3
+routing exercises, never real screens) removed; nav now links Home/Patients, with
+Appointments/Admissions to be added once those routes exist. Lint and `vite build` both clean.
+
+**Still open for checkpoint 6**: Appointments and Admissions — two-step booking flow (patient
+search → booking form, facility fixed) and the list+detail split-pane (status tabs, date
+navigator, URL-driven selected item) — both new-concept, hands-on per the build-mode split above.
+Also still open: the checkpoint-5 "known open gap" (mid-session 401 expiry handling in
+`api/client.js`), worth doing before these screens start mutating data.
+  directly before building the API client/each screen; this summary is deliberately condensed.

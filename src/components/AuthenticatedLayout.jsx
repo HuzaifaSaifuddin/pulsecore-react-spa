@@ -17,11 +17,8 @@ function AuthenticatedLayout() {
           <Link to="/" className="text-sm text-gray-600 hover:text-blue-600">
             Home
           </Link>
-          <Link to="/about" className="text-sm text-gray-600 hover:text-blue-600">
-            About
-          </Link>
-          <Link to="/career" className="text-sm text-gray-600 hover:text-blue-600">
-            Career
+          <Link to="/patients" className="text-sm text-gray-600 hover:text-blue-600">
+            Patients
           </Link>
         </div>
         <LogoutButton />
