@@ -173,6 +173,22 @@ screens for these."
   *computed property key* — whatever string is in the input's `name` attribute becomes the object
   key that gets written — which is what lets one handler serve every field instead of one handler
   per field. Every input needs a matching `name` now, since that's the wiring the handler reads.
+- **Context/Provider access is purely tree position, and each side decides independently.** Talked
+  through with `BrowserRouter`/`AuthProvider` as the real examples, generalized via a hypothetical
+  `CurrentUserContext`/`CurrentFacilityContext` split: (1) a `Provider` only needs mounting *once*,
+  wherever in the tree its value should reach — root for app-wide state, but that's a choice
+  (Provider placement scopes *how far down* a value reaches), not a rule; (2) every component below
+  it independently decides which hook(s), if any, to call — nothing about being inside a
+  `Provider`'s subtree forces a component to consume it, and two sibling `Provider`s can be
+  consumed in any combination (both, one, or neither) by any descendant. A component rendered as a
+  *sibling* of a `Provider` (not nested inside it) gets none of this — `useContext` there returns
+  `createContext`'s default value (often `null`), and destructuring off that throws; same failure
+  mode as a routing hook used outside `<BrowserRouter>` (a router-specific invariant error instead
+  of a bare `null`-destructure crash, but the same "no Provider ancestor" root cause). Also covered:
+  the *real* (rare, not-yet-needed-here) reason to split one Context into two — unrelated consumers
+  re-rendering on every Provider-value change, since React can't tell a consumer only cared about
+  one field of the value object; that's a re-render-scoping optimization, not an access-control
+  mechanism (Context has no such thing — any descendant that calls the hook sees the whole value).
 
 ## Progress
 
