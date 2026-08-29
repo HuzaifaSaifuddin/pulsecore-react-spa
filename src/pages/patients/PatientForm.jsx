@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError, patch, post } from '../../api/client'
+import { useToast } from '../../context/useToast.js'
 
 // Shared by both the "register a new patient" and "edit an existing patient"
 // routes. Editing carries the patient record in via router state (set by
@@ -11,6 +12,7 @@ function PatientForm() {
   const { id } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const { addToast } = useToast()
   const [searchParams] = useSearchParams()
   const next = searchParams.get('next')
 
@@ -44,6 +46,12 @@ function PatientForm() {
       const data = isEditing
         ? await patch(`/api/v1/patients/${id}`, body)
         : await post('/api/v1/patients', body)
+
+      const fullName = `${data.patient.first_name} ${data.patient.last_name}`
+      addToast(
+        isEditing ? `Patient ${fullName} updated.` : `Patient ${fullName} registered successfully.`,
+        'success',
+      )
 
       if (next) {
         // Create supports "register inline, then continue" (e.g. from

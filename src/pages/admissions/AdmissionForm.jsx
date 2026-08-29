@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError, get, patch, post } from '../../api/client'
 import { useAuth } from '../../context/useAuth.js'
+import { useToast } from '../../context/useToast.js'
 import { toDatetimeLocalString, toLocalDateString } from '../../utils/date'
 
 // Identical shape to AppointmentForm -- see that file's comments -- with
@@ -12,6 +13,7 @@ function AdmissionForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { currentFacility } = useAuth()
+  const { addToast } = useToast()
 
   const isEditing = Boolean(id)
   const existingAdmission = location.state?.admission
@@ -96,6 +98,12 @@ function AdmissionForm() {
         : await post('/api/v1/admissions', body)
 
       const admission = data.admission
+      const patientName = `${admission.patient.first_name} ${admission.patient.last_name}`
+      addToast(
+        isEditing ? `Admission for ${patientName} updated.` : `Admission booked for ${patientName}.`,
+        'success',
+      )
+
       const admissionDate = toLocalDateString(new Date(admission.admission_start))
       navigate(`/admissions?status=${admission.status}&date=${admissionDate}&admission=${admission.id}`)
     } catch (err) {

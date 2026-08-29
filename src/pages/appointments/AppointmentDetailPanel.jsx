@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError, patch, post } from '../../api/client'
 import { useAuth } from '../../context/useAuth.js'
+import { useToast } from '../../context/useToast.js'
 import { toLocalDateString } from '../../utils/date'
 import { formatStatus } from '../../utils/status'
 
@@ -13,6 +14,18 @@ const ADVANCE_LABELS = {
   in_progress: 'Complete',
 }
 
+// Success-toast copy matching the Django reference's messages.success()
+// text exactly (views.py) for advance/revert/cancel/uncancel/notes. Errors
+// use the API's own error message instead of Django's static text -- the
+// Rails response is the more accurate, specific source (see CLAUDE.md's
+// established "never hand-roll what the API already says" convention).
+const SUCCESS_MESSAGES = {
+  cancel: () => 'Appointment cancelled.',
+  uncancel: () => 'Appointment restored to Scheduled.',
+  advance_status: (a) => `Appointment marked as ${formatStatus(a.status)}.`,
+  revert_status: (a) => `Appointment reverted to ${formatStatus(a.status)}.`,
+}
+
 // Read-only info + the four status actions (advance/revert/cancel/uncancel)
 // + inline notes editing. No delete action -- the API has none for
 // appointments (see CLAUDE.md). `onUpdate` hands the freshly-returned
@@ -20,31 +33,31 @@ const ADVANCE_LABELS = {
 // the row in the table stay in sync without a full list refetch.
 function AppointmentDetailPanel({ appointment, statusFilter, selectedDate, onUpdate }) {
   const { currentFacility } = useAuth()
+  const { addToast } = useToast()
   const [notes, setNotes] = useState(appointment.notes || '')
-  const [error, setError] = useState(null)
 
   const nextUrl = `/appointments?status=${statusFilter}&date=${toLocalDateString(selectedDate)}&appointment=${appointment.id}`
 
   async function runAction(action) {
-    setError(null)
     try {
       const data = await post(`/api/v1/appointments/${appointment.id}/${action}`)
       onUpdate(data.appointment)
+      addToast(SUCCESS_MESSAGES[action](data.appointment), 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong')
+      addToast(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong', 'error')
     }
   }
 
   async function handleSaveNotes(event) {
     event.preventDefault()
-    setError(null)
     try {
       const data = await patch(`/api/v1/appointments/${appointment.id}`, {
         appointment: { notes },
       })
       onUpdate(data.appointment)
+      addToast('Notes updated.', 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong')
+      addToast(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong', 'error')
     }
   }
 
@@ -70,12 +83,6 @@ function AppointmentDetailPanel({ appointment, statusFilter, selectedDate, onUpd
         MRN {appointment.patient.mrn} &middot; {appointment.patient.gender} &middot; DOB{' '}
         {appointment.patient.date_of_birth}
       </p>
-
-      {error && (
-        <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      )}
 
       <dl className="grid grid-cols-2 gap-3 text-sm mb-6">
         <div>

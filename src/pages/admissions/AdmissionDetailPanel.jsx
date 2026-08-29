@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError, patch, post } from '../../api/client'
 import { useAuth } from '../../context/useAuth.js'
+import { useToast } from '../../context/useToast.js'
 import { toLocalDateString } from '../../utils/date'
 import { formatStatus } from '../../utils/status'
 
@@ -15,31 +16,41 @@ const ADVANCE_LABELS = {
   admitted: 'Mark Discharged',
 }
 
+// Same Django-matching success copy as AppointmentDetailPanel, "Admission"
+// swapped for "Appointment" -- confirmed against admissions/views.py, not
+// assumed identical.
+const SUCCESS_MESSAGES = {
+  cancel: () => 'Admission cancelled.',
+  uncancel: () => 'Admission restored to Scheduled.',
+  advance_status: (a) => `Admission marked as ${formatStatus(a.status)}.`,
+  revert_status: (a) => `Admission reverted to ${formatStatus(a.status)}.`,
+}
+
 function AdmissionDetailPanel({ admission, statusFilter, selectedDate, onUpdate }) {
   const { currentFacility } = useAuth()
+  const { addToast } = useToast()
   const [notes, setNotes] = useState(admission.notes || '')
-  const [error, setError] = useState(null)
 
   const nextUrl = `/admissions?status=${statusFilter}&date=${toLocalDateString(selectedDate)}&admission=${admission.id}`
 
   async function runAction(action) {
-    setError(null)
     try {
       const data = await post(`/api/v1/admissions/${admission.id}/${action}`)
       onUpdate(data.admission)
+      addToast(SUCCESS_MESSAGES[action](data.admission), 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong')
+      addToast(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong', 'error')
     }
   }
 
   async function handleSaveNotes(event) {
     event.preventDefault()
-    setError(null)
     try {
       const data = await patch(`/api/v1/admissions/${admission.id}`, { admission: { notes } })
       onUpdate(data.admission)
+      addToast('Notes updated.', 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong')
+      addToast(err instanceof ApiError ? err.errors?.[0] || err.message : 'Something went wrong', 'error')
     }
   }
 
@@ -65,12 +76,6 @@ function AdmissionDetailPanel({ admission, statusFilter, selectedDate, onUpdate 
         MRN {admission.patient.mrn} &middot; {admission.patient.gender} &middot; DOB{' '}
         {admission.patient.date_of_birth}
       </p>
-
-      {error && (
-        <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      )}
 
       <dl className="grid grid-cols-2 gap-3 text-sm mb-6">
         <div>

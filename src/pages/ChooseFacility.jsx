@@ -1,14 +1,17 @@
 import { useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '../context/useAuth.js'
+import { useToast } from '../context/useToast.js'
 
 function ChooseFacility() {
   const { setCurrentFacility, accessibleFacilities } = useAuth()
+  const { addToast } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const next = searchParams.get('next') || '/'
 
   function pick(facility) {
     setCurrentFacility(facility)
+    addToast(`Working at ${facility.name}.`, 'success')
     navigate(next, { replace: true })
   }
 

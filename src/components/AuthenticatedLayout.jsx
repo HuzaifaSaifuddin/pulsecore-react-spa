@@ -1,10 +1,13 @@
 import { Navigate, Outlet, Link } from 'react-router'
 import { useAuth } from '../context/useAuth.js'
+import { useToast } from '../context/useToast.js'
 import LogoutButton from './LogoutButton'
+import ToastStack from './ToastStack'
 
 function AuthenticatedLayout() {
   const { isLoggedIn, currentUser, currentFacility, accessibleFacilities, setCurrentFacility } =
     useAuth()
+  const { addToast } = useToast()
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />
@@ -40,6 +43,7 @@ function AuthenticatedLayout() {
                 onChange={(event) => {
                   const facility = accessibleFacilities.find((f) => f.id === event.target.value)
                   setCurrentFacility(facility)
+                  addToast(`Switched to ${facility.name}.`, 'success')
                 }}
                 className="bg-transparent border-0 py-0 pr-6 text-gray-900 font-medium focus:ring-0 cursor-pointer"
               >
@@ -62,6 +66,7 @@ function AuthenticatedLayout() {
           <LogoutButton />
         </div>
       </nav>
+      <ToastStack />
       <main className="p-6">
         <Outlet />
       </main>

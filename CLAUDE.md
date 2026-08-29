@@ -467,5 +467,56 @@ directly per Huzaifa's request ("go ahead and work on it once done explain to me
   gave a false-clean result from tracking starting too late — re-verified properly after catching
   that).
 
-**Still open for checkpoint 6/7**: the list/form error-UI gap just above; checkpoint 7's remaining
-shared-component polish (flash/toast stack); checkpoint 8 (testing).
+**Flash/toast stack done** (2026-08-29, checkpoint 7). Built directly per Huzaifa's request ("do
+the flash/toast stack next and let me know once done").
+
+- **`src/context/ToastContext.jsx`/`useToast.js`**: a second, independent Context, same
+  Provider/`useContext` shape as `AuthContext` — mounted alongside it in `main.jsx`
+  (`<AuthProvider><ToastProvider><App /></ToastProvider></AuthProvider>`), consumed independently
+  by anything that calls `useToast()`. `addToast(message, type)` appends `{id, message, type}` and
+  schedules its own removal via a plain `setTimeout` (4s) — no `useEffect` needed for the
+  auto-dismiss, since `addToast` is always called imperatively from an event handler/promise
+  resolution, never during render, and `ToastProvider` itself never unmounts for the app's
+  lifetime (so no stale-timer-after-unmount risk the way there would be if each toast owned its own
+  effect).
+- **`src/components/ToastStack.jsx`**: rendered once, inside `AuthenticatedLayout` directly under
+  `<nav>` (brief: "rendered as a stack under the nav") — not at the app root, since every screen
+  that can trigger a toast already lives inside that layout. Exact classes from brief §7 (`bg-green
+  -50 text-green-800 border-green-200` success / `bg-red-50 text-red-800 border-red-200` error /
+  `bg-blue-50 text-blue-800 border-blue-200` info), plus a manual dismiss `×` button (a deliberate
+  addition beyond the Django reference, which is server-rendered/one-shot per page load and so
+  never needed one — this version persists across client-side navigations and stacks, so a manual
+  dismiss is a reasonable small UX addition).
+- **Trigger mapping pulled from the Django reference's actual `messages.*` calls** (grepped across
+  every views.py, not guessed) rather than invented: success copy matches Django's text exactly
+  where a screen exists in this app (`"Patient X registered successfully."`, `"Appointment marked
+  as {status}."`, `"Notes updated."`, etc.); error copy deliberately does **not** match Django's
+  static text — it uses the Rails API's own error message instead, the more accurate/specific
+  source, consistent with this project's established "never hand-roll what the API already says"
+  convention. Facilities/Accounts management screens exist in Django's messages.py grep but have no
+  React equivalent yet (not in this project's curriculum) — skipped, not stubbed.
+- **Scope decision, matching Django's own split**: form *validation* errors (422s on the three
+  booking/registration forms) stay exactly as they were — inline red boxes near the form, since
+  that's how Django renders `ModelForm` field/non-field errors too (`{{ form.non_field_errors.0 }}`
+  never `messages.error`). Only *action outcomes* — status advance/revert/cancel/uncancel, notes
+  save, facility switch — moved to toasts, both success and error, replacing the detail panels'
+  former inline error box entirely, matching Django's own use of `messages.error` for exactly those
+  same blocked-action cases (e.g. "Only Scheduled appointments can be cancelled.").
+- **`AuthenticatedLayout`'s facility switcher and `ChooseFacility`'s picker** both gained a toast
+  (`"Switched to {name}."` / `"Working at {name}."`, matching `accounts/views.py`'s
+  `set-default-facility`/`working-at` message text) — confirms Context state survives a client-side
+  navigation: `ChooseFacility` calls `addToast` immediately before `navigate(next, {replace:true})`,
+  and the toast is still showing on whatever screen `next` lands on, since `ToastProvider` wraps the
+  whole route tree and isn't reset by a route change (only a full page reload would clear it).
+- **Verified end-to-end in a real browser**, not assumed: registered a real patient (green toast,
+  survived the `/patients/new` → `/patients` navigation, auto-dismissed after ~4s on its own),
+  advanced a real appointment's status (`"Appointment marked as In progress."`), saved notes
+  (`"Notes updated."`) — all exact copy, correct color, dismiss button working, clean console. The
+  inline-error path (a blank required field) confirmed untouched, still inline as intended. Did not
+  force an artificial API error to check the red-toast styling specifically — same code path and
+  exact brief-specified class string as the already-confirmed green case, low marginal value versus
+  contriving a race condition to reach it.
+
+**Still open**: the list/form error-UI gap (no visible message for a generic fetch failure on
+mount-time loads, separate from the toast work above and from the inline-error/toast split — a
+network/500 failure still just leaves a screen stuck loading or empty); checkpoint 8 (testing).

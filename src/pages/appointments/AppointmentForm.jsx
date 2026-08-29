@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ApiError, get, patch, post } from '../../api/client'
 import { useAuth } from '../../context/useAuth.js'
+import { useToast } from '../../context/useToast.js'
 import { toDatetimeLocalString, toLocalDateString } from '../../utils/date'
 
 // Step two of the two-step booking flow, shared with editing an existing
@@ -14,6 +15,7 @@ function AppointmentForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { currentFacility } = useAuth()
+  const { addToast } = useToast()
 
   const isEditing = Boolean(id)
   const existingAppointment = location.state?.appointment
@@ -106,6 +108,12 @@ function AppointmentForm() {
         : await post('/api/v1/appointments', body)
 
       const appointment = data.appointment
+      const patientName = `${appointment.patient.first_name} ${appointment.patient.last_name}`
+      addToast(
+        isEditing ? `Appointment for ${patientName} updated.` : `Appointment booked for ${patientName}.`,
+        'success',
+      )
+
       const scheduledDate = toLocalDateString(new Date(appointment.scheduled_start))
       navigate(
         `/appointments?status=${appointment.status}&date=${scheduledDate}&appointment=${appointment.id}`,
