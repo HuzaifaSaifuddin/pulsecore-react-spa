@@ -611,12 +611,26 @@ deliberately bounded, not scope-crept.
 
 **Setup**: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-
 event`, `jsdom` (devDependencies only — none of this ships in the production build). `vite.config.js`
-gains a `test` block (`environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`) — Vitest reuses
+gains a `test` block (`environment: 'jsdom'`, `setupFiles: ['./tests/setup.js']`) — Vitest reuses
 the same Vite config already handling the real app, no separate build tool. `package.json` gains
 `test` (`vitest run`, single pass — CI-shaped) and `test:watch` (`vitest`, interactive). Deliberately
 **not** using Vitest's `globals: true` — every test file explicitly imports `describe`/`it`/
 `expect`/`vi` from `'vitest'` instead of relying on injected globals, so ESLint's existing config
 (`eslint.config.js`) needs no test-specific global additions at all.
+
+**Tree layout, revised same day**: originally built co-located (`Component.test.jsx` beside
+`Component.jsx`) — the dominant convention in current React/Vite tooling, not an oversight, but also
+not the *only* professional convention. Huzaifa asked directly whether tests should live separately
+"like in a professional app," raising his own concern about confusion as the app grows; React itself
+has no single strict answer (co-location and a separate tree are both genuinely common), so moved to
+a top-level `tests/` directory mirroring `src/`'s structure 1:1 — the closest match to the Rails
+`spec/`/`app/` split he already knows (`spec/models/user_spec.rb` ↔ `app/models/user.rb`), and a
+widely-recognized JS convention in its own right, not a compromise. Every test file's imports became
+one directory-depth longer (e.g. `tests/components/DateNavigator.test.jsx` imports
+`../../src/components/DateNavigator`); `vite.config.js`'s `setupFiles` path updated to match. No
+config changes needed beyond that — Vitest's default include glob and ESLint's `**/*.{js,jsx}` both
+already cover `tests/` with no extra setup. Re-verified after the move: 26/26 tests passing, lint
+and build both clean, nothing left under `src/`.
 
 **Three real, non-obvious bugs hit and fixed while setting this up, not just "install and go"**:
 - **`@testing-library/jest-dom`'s plain import assumes a global `expect`** (Jest's default) — threw
@@ -629,7 +643,7 @@ the same Vite config already handling the real app, no separate build tool. `pac
   was appending into `document.body` without ever clearing the previous test's output, so by the
   third test in a file, queries like `getByText('Today')` failed with "found multiple elements" —
   looked like a broken component at first glance, was actually a test-harness gap. Fixed with an
-  explicit `afterEach(() => cleanup())` in `src/test/setup.js`.
+  explicit `afterEach(() => cleanup())` in `tests/setup.js`.
 - **A fake-timer-advanced state update needs `act()` to flush before the next assertion.**
   `ToastStack`'s auto-dismiss test (`vi.useFakeTimers()` + `vi.advanceTimersByTime(4000)`) failed
   even though the underlying `setTimeout(() => removeToast(id), 4000)` logic is correct — the timer
@@ -639,7 +653,7 @@ the same Vite config already handling the real app, no separate build tool. `pac
   false positives logged earlier in this file (React's own scheduling not being obviously
   synchronous), different manifestation.
 
-**Component tests** (`src/components/*.test.jsx`): `DateNavigator` (prev/next/today all call
+**Component tests** (`tests/components/*.test.jsx`): `DateNavigator` (prev/next/today all call
 `onChange` with the right date; "Today" highlighted only when the selected date actually is today),
 `StatusTabs` (renders every tab, active-tab styling, `onChange` fires with the clicked value),
 `ToastStack` (renders nothing with zero toasts; a triggered toast is styled by type; manual dismiss;

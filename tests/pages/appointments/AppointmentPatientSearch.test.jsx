@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import AppointmentPatientSearch from './AppointmentPatientSearch'
-import { get } from '../../api/client'
+import AppointmentPatientSearch from '../../../src/pages/appointments/AppointmentPatientSearch'
+import { get } from '../../../src/api/client'
 
 // Mocks the API client entirely -- this is step one of the two-step
 // booking flow, and the thing worth testing is the client-side filtering
 // and the handoff into step two, not the real network call.
-vi.mock('../../api/client')
+vi.mock('../../../src/api/client')
 
 const PATIENTS = [
   { id: 'p1', first_name: 'Naida', last_name: 'Kiehn', mrn: 'P-000005', phone_number: '9623002900' },

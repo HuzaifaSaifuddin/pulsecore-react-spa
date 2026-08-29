@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router'
-import AuthenticatedLayout from './AuthenticatedLayout'
-import { useAuth } from '../context/useAuth.js'
-import { useToast } from '../context/useToast.js'
+import AuthenticatedLayout from '../../src/components/AuthenticatedLayout'
+import { useAuth } from '../../src/context/useAuth.js'
+import { useToast } from '../../src/context/useToast.js'
 
-vi.mock('../context/useAuth.js')
-vi.mock('../context/useToast.js')
+vi.mock('../../src/context/useAuth.js')
+vi.mock('../../src/context/useToast.js')
 
 function renderLayout(isLoggedIn) {
   vi.mocked(useAuth).mockReturnValue({

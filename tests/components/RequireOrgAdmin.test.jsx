@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router'
-import RequireOrgAdmin from './RequireOrgAdmin'
-import { useAuth } from '../context/useAuth.js'
+import RequireOrgAdmin from '../../src/components/RequireOrgAdmin'
+import { useAuth } from '../../src/context/useAuth.js'
 
-vi.mock('../context/useAuth.js')
+vi.mock('../../src/context/useAuth.js')
 
 function renderWithUser(currentUser) {
   vi.mocked(useAuth).mockReturnValue({ currentUser })

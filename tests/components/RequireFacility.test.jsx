@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router'
-import RequireFacility from './RequireFacility'
-import { useAuth } from '../context/useAuth.js'
+import RequireFacility from '../../src/components/RequireFacility'
+import { useAuth } from '../../src/context/useAuth.js'
 
 // Mocks the whole module -- RequireFacility only ever calls useAuth(), so
 // each test controls exactly what it returns instead of needing a real
 // AuthProvider (and the GET /api/v1/me call that would trigger).
-vi.mock('../context/useAuth.js')
+vi.mock('../../src/context/useAuth.js')
 
 // Renders whatever RequireFacility redirected to, so the test can inspect
 // the actual URL (path + query string) it landed on.

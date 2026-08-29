@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ToastProvider } from '../context/ToastContext.jsx'
-import { useToast } from '../context/useToast.js'
-import ToastStack from './ToastStack'
+import { ToastProvider } from '../../src/context/ToastContext.jsx'
+import { useToast } from '../../src/context/useToast.js'
+import ToastStack from '../../src/components/ToastStack'
 
 // A tiny consumer so tests can trigger addToast() the same way a real
 // screen would (via useToast()), rather than reaching into ToastProvider's

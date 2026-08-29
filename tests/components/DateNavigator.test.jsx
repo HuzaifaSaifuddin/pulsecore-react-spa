@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DateNavigator from './DateNavigator'
+import DateNavigator from '../../src/components/DateNavigator'
 
 describe('DateNavigator', () => {
   it('shows the selected date, formatted', () => {
