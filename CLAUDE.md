@@ -189,7 +189,14 @@ screens for these."
   re-rendering on every Provider-value change, since React can't tell a consumer only cared about
   one field of the value object; that's a re-render-scoping optimization, not an access-control
   mechanism (Context has no such thing — any descendant that calls the hook sees the whole value).
-
+- **A string-key mismatch in `setSearchParams({...})` fails silently, not loudly.** Surfaced via a
+  quiz scenario (a typo'd `appointment:` key inside `AdmissionList`'s `handleRowClick`, which reads
+  `admission` everywhere else): JS never validates an object literal's keys against anything, so
+  the URL would happily gain a `?appointment=<uuid>` nobody reads, while `searchParams.get
+  ('admission')` stays `null` forever — no crash, no warning, just a selection that silently never
+  resolves. Direct contrast with the Context/router failures logged just above (missing `Provider`
+  ancestor → loud crash or invariant error) — same "wrong thing, no validation" root shape, but a
+  plain object key typo is the quiet failure mode instead of the loud one.
 ## Progress
 
 **Current checkpoint:** 2 complete (2026-08-17) — React + Vite fundamentals (components, props,
