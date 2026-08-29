@@ -368,7 +368,27 @@ safe, never `toISOString()` for deriving a calendar date/local timestamp; `src/u
   class of gap as the checkpoint-5 `/me` endpoint before it was built; worth a similar prompt to the
   Rails session if this starts causing real confusion.
 
-**Still open for checkpoint 6**: Admissions (mirror of the Appointments build above — same
-components should be directly reusable via props, same file shape). Also still open: the
-checkpoint-5 "known open gap" (mid-session 401 expiry handling in `api/client.js`), worth doing
-before Admissions starts mutating data too.
+**Admissions feature done end-to-end** (2026-08-29), built directly per the now-settled precedent
+from Appointments (no re-confirmation asked — see [[feedback_show_examples_new_apis]]'s
+2026-08-29 update on not re-asking the same scope question twice in a row for the same class of
+work). Structurally a near-clone of Appointments, confirmed against the Django reference's own
+`forms.py`/`views.py`/templates before building rather than assumed: `AdmissionPatientSearch`,
+`AdmissionForm`, `AdmissionList`, `AdmissionDetailPanel` in `src/pages/admissions/`, reusing
+`DateNavigator`/`StatusTabs`/`src/utils/{date,status}.js` as-is. Field names swapped
+(`admission_start`/`admission_end` for `scheduled_start`/`scheduled_end`), status set is
+`scheduled → arrived → admitted → discharged` (one more rung than Appointment's three-status
+chain) with advance-button labels `Mark Arrived` → `Mark Admitted` → `Mark Discharged`. Route
+shape mirrors Appointments exactly: `/admissions`, `/admissions/search`, `/admissions/new`,
+`/admissions/:id/edit`, all inside `RequireFacility`. Nav gained an `Admissions` link between
+Appointments and Patients, matching the Django reference's own link order.
+
+**Verified end-to-end in a real browser** against the live Rails API: booking a new admission for
+a patient with a prior *discharged* admission today (confirmed this doesn't false-positive against
+the same-day conflict rule, since `discharged` isn't in `ACTIVE_STATUSES`), then walked the full
+three-step advance ladder (Mark Arrived → Mark Admitted → Mark Discharged) confirming each button
+label changes correctly and the row/detail-panel sync matches Appointments' behavior. Lint and
+`vite build` both clean; no console errors.
+
+**Still open for checkpoint 6**: the checkpoint-5 "known open gap" (mid-session 401 expiry
+handling in `api/client.js`) — now overdue, both Appointments and Admissions mutate data without
+it. Worth doing next, before checkpoint 7's shared-component polish pass or checkpoint 8 (testing).

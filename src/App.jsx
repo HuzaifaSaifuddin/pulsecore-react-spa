@@ -10,6 +10,9 @@ import PatientForm from './pages/patients/PatientForm'
 import AppointmentList from './pages/appointments/AppointmentList'
 import AppointmentPatientSearch from './pages/appointments/AppointmentPatientSearch'
 import AppointmentForm from './pages/appointments/AppointmentForm'
+import AdmissionList from './pages/admissions/AdmissionList'
+import AdmissionPatientSearch from './pages/admissions/AdmissionPatientSearch'
+import AdmissionForm from './pages/admissions/AdmissionForm'
 
 function App() {
   const { checkingSession } = useAuth()
@@ -40,6 +43,10 @@ function App() {
           <Route path="/appointments/search" element={<AppointmentPatientSearch />} />
           <Route path="/appointments/new" element={<AppointmentForm />} />
           <Route path="/appointments/:id/edit" element={<AppointmentForm />} />
+          <Route path="/admissions" element={<AdmissionList />} />
+          <Route path="/admissions/search" element={<AdmissionPatientSearch />} />
+          <Route path="/admissions/new" element={<AdmissionForm />} />
+          <Route path="/admissions/:id/edit" element={<AdmissionForm />} />
         </Route>
       </Route>
     </Routes>

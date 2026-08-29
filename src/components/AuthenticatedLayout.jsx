@@ -23,6 +23,9 @@ function AuthenticatedLayout() {
             <Link to="/appointments" className="text-gray-700 hover:text-blue-600">
               Appointments
             </Link>
+            <Link to="/admissions" className="text-gray-700 hover:text-blue-600">
+              Admissions
+            </Link>
             <Link to="/patients" className="text-gray-700 hover:text-blue-600">
               Patients
             </Link>
