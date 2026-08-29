@@ -8,9 +8,18 @@ function PatientList() {
 
   useEffect(() => {
     async function loadPatients() {
-      const data = await get('/api/v1/patients')
-      setPatients(data.patients)
-      setLoading(false)
+      try {
+        const data = await get('/api/v1/patients')
+        setPatients(data.patients)
+      } catch {
+        // A 401 here means the session expired mid-use -- client.js's global
+        // handler already cleared auth state and the route guard is about to
+        // redirect to /login, nothing left for this effect to do. Any other
+        // failure is swallowed too for now; this screen has no error-UI state
+        // yet, a separate gap from the uncaught-rejection one this closes.
+      } finally {
+        setLoading(false)
+      }
     }
     loadPatients()
   }, [])

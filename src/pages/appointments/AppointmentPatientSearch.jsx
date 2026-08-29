@@ -19,18 +19,24 @@ function AppointmentPatientSearch() {
     const formQuery = new FormData(event.target).get('q').trim()
     setSearchParams(formQuery ? { q: formQuery } : {})
 
-    const data = await get('/api/v1/patients')
-    const lowerQuery = formQuery.toLowerCase()
-    const matches = data.patients.filter((patient) => {
-      const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
-      return (
-        fullName.includes(lowerQuery) ||
-        patient.mrn.toLowerCase().includes(lowerQuery) ||
-        patient.phone_number?.includes(formQuery)
-      )
-    })
-    setPatients(matches)
-    setSearched(true)
+    try {
+      const data = await get('/api/v1/patients')
+      const lowerQuery = formQuery.toLowerCase()
+      const matches = data.patients.filter((patient) => {
+        const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
+        return (
+          fullName.includes(lowerQuery) ||
+          patient.mrn.toLowerCase().includes(lowerQuery) ||
+          patient.phone_number?.includes(formQuery)
+        )
+      })
+      setPatients(matches)
+      setSearched(true)
+    } catch {
+      // A 401 is already handled globally (redirect in flight); any other
+      // failure just leaves the results empty rather than crashing the
+      // click handler.
+    }
   }
 
   return (

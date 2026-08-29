@@ -35,9 +35,16 @@ function AdmissionList() {
   useEffect(() => {
     async function loadAdmissions() {
       setLoading(true)
-      const data = await get(`/api/v1/admissions?date=${selectedDateString}`)
-      setAdmissions(data.admissions)
-      setLoading(false)
+      try {
+        const data = await get(`/api/v1/admissions?date=${selectedDateString}`)
+        setAdmissions(data.admissions)
+      } catch {
+        // See PatientList's identical catch for why this is empty -- a 401
+        // is already handled globally (redirect in flight); anything else
+        // has no error UI to land in yet.
+      } finally {
+        setLoading(false)
+      }
     }
     loadAdmissions()
   }, [selectedDateString])

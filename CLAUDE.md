@@ -419,6 +419,53 @@ three-step advance ladder (Mark Arrived → Mark Admitted → Mark Discharged) c
 label changes correctly and the row/detail-panel sync matches Appointments' behavior. Lint and
 `vite build` both clean; no console errors.
 
-**Still open for checkpoint 6**: the checkpoint-5 "known open gap" (mid-session 401 expiry
-handling in `api/client.js`) — now overdue, both Appointments and Admissions mutate data without
-it. Worth doing next, before checkpoint 7's shared-component polish pass or checkpoint 8 (testing).
+**Mid-session 401 expiry handling done** (2026-08-29), closing the checkpoint-5 known gap. Built
+directly per Huzaifa's request ("go ahead and work on it once done explain to me").
+
+- **`src/api/client.js`**: `setUnauthorizedHandler(handler)` lets a plain (non-component) module
+  hold a reference to a callback, since it can't call `useAuth()`/hooks itself. `request()` calls
+  it whenever a response is `401` specifically (never `403` — `403` means a real logged-in user
+  just lacks permission for one action, e.g. a non-org_admin hitting `POST /api/v1/facilities`,
+  which says nothing about their session being invalid; only `401` means "the server doesn't
+  consider this session authenticated" at all).
+- **`AuthContext.jsx`**: registers `clearAuthState` (extracted from `logout()`'s local-state reset,
+  now shared by both) via `setUnauthorizedHandler` in the same boot effect that calls
+  `loadSession()`, before that first request ever fires. Deliberately does **not** call
+  `navigate()` itself — clearing `currentUser` is enough on its own, since `AuthenticatedLayout`'s
+  existing `if (!isLoggedIn) return <Navigate replace />` guard already handles the redirect once
+  `isLoggedIn` (derived) goes false. One request, one 401, no per-call-site wiring anywhere in the
+  app — reuses the same declarative-guard architecture from checkpoint 3 rather than adding a
+  second, imperative redirect mechanism.
+- Hit a second real `react-hooks/exhaustive-deps` false positive in the same boot effect (missing
+  dep `loadSession`) once a second statement was added — same class of already-documented
+  false-positive in this file (`clearAuthState`/`loadSession` only close over `useState` setters,
+  guaranteed stable by React, and stable module-level imports, so despite being new function
+  objects each render their behavior never actually changes) — fixed with a scoped, commented
+  `eslint-disable-next-line`, consistent with this file's existing precedent for the sibling
+  `set-state-in-effect` case.
+- **Real bug caught during verification, not just assumed fixed**: the redirect itself worked on
+  the first pass, but the console showed an uncaught `ApiError` exception — `unauthorizedHandler`
+  fires and clears state *before* `request()`'s throw propagates, but none of the app's 9
+  `await get(...)` call sites (every mount-effect and the two patient-search submit handlers,
+  across `PatientList`/`AppointmentList`/`AdmissionList`/`AppointmentForm`/`AdmissionForm`/
+  `AppointmentPatientSearch`/`AdmissionPatientSearch`) had a `try`/`catch` at all — a pre-existing,
+  systemic gap this surfaced rather than introduced (any fetch failure there, 401 or otherwise, was
+  already an unhandled promise rejection; nothing before this exercised that path). Fixed all 9 with
+  a `try`/`catch` (`finally` where loading state needs resetting) — silently swallows both the
+  401 case (already handled globally) and any other failure, since none of these screens have an
+  error-UI state to show yet. **That's still a real, separate, not-yet-fixed gap**: a genuine
+  network/500 failure on any list/form screen currently just leaves it stuck on "Loading…" or with
+  empty results, no visible error message — worth a pass alongside checkpoint 7's flash/toast stack
+  (a toast would be a natural place to surface these, instead of adding one-off inline error UI to
+  every screen).
+- **Verified end-to-end in a real browser**, not assumed from reading the code: logged in, called
+  `DELETE /users/sign_out` directly via the console (bypassing the app's own `logout()` entirely,
+  to simulate a session revoked/expired elsewhere without touching React state), then triggered a
+  real API call from the UI two different ways (date-nav click on an already-mounted screen, and a
+  fresh mount via nav-link click) — both correctly bounced straight to `/login` with an empty
+  console, confirmed by starting console tracking *before* triggering the revoke (an earlier check
+  gave a false-clean result from tracking starting too late — re-verified properly after catching
+  that).
+
+**Still open for checkpoint 6/7**: the list/form error-UI gap just above; checkpoint 7's remaining
+shared-component polish (flash/toast stack); checkpoint 8 (testing).

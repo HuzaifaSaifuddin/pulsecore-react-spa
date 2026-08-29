@@ -36,17 +36,30 @@ function AdmissionForm() {
   useEffect(() => {
     if (patient || isEditing) return
     async function resolvePatient() {
-      const data = await get('/api/v1/patients')
-      setPatient(data.patients.find((p) => p.id === patientId) || null)
-      setPatientResolved(true)
+      try {
+        const data = await get('/api/v1/patients')
+        setPatient(data.patients.find((p) => p.id === patientId) || null)
+      } catch {
+        // A 401 is already handled globally (redirect in flight). Any other
+        // failure just leaves `patient` unresolved, which the render below
+        // already treats as "redirect back to search" -- see the Navigate
+        // check further down.
+      } finally {
+        setPatientResolved(true)
+      }
     }
     resolvePatient()
   }, [patient, isEditing, patientId])
 
   useEffect(() => {
     async function loadDoctors() {
-      const data = await get('/api/v1/users')
-      setDoctors(data.users.filter((user) => user.role === 'doctor'))
+      try {
+        const data = await get('/api/v1/users')
+        setDoctors(data.users.filter((user) => user.role === 'doctor'))
+      } catch {
+        // A 401 is already handled globally; any other failure just leaves
+        // the doctor dropdown empty rather than crashing the form.
+      }
     }
     loadDoctors()
   }, [])
