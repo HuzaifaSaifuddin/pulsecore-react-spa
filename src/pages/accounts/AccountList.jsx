@@ -3,10 +3,8 @@ import { Link } from 'react-router'
 import { get } from '../../api/client'
 import { useAuth } from '../../context/useAuth.js'
 
-// Any role can view (matches GET /api/v1/users' any-role read scope); Add
-// link only for org_admin. No Edit link anywhere -- no PATCH
-// /api/v1/users/:id exists at all, unlike every other list in this app
-// (see CLAUDE.md).
+// Any role can view (matches GET /api/v1/users' any-role read scope);
+// Add/Edit links only for org_admin.
 function AccountList() {
   const { currentUser } = useAuth()
   const [users, setUsers] = useState([])
@@ -48,12 +46,13 @@ function AccountList() {
           <tr>
             <th className="px-4 py-2">Name</th>
             <th className="px-4 py-2">Role</th>
+            <th className="px-4 py-2"></th>
           </tr>
         </thead>
         <tbody>
           {users.length === 0 && (
             <tr>
-              <td colSpan="2" className="px-4 py-6 text-center text-gray-500">
+              <td colSpan="3" className="px-4 py-6 text-center text-gray-500">
                 No accounts yet.
               </td>
             </tr>
@@ -62,6 +61,17 @@ function AccountList() {
             <tr key={account.id} className="border-t border-gray-200">
               <td className="px-4 py-2">{account.email}</td>
               <td className="px-4 py-2">{account.role}</td>
+              <td className="px-4 py-2 text-right">
+                {isOrgAdmin && (
+                  <Link
+                    to={`/accounts/${account.id}/edit`}
+                    state={{ account }}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Edit
+                  </Link>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

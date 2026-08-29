@@ -48,6 +48,7 @@ function App() {
           <Route path="/facilities/new" element={<FacilityForm />} />
           <Route path="/facilities/:id/edit" element={<FacilityForm />} />
           <Route path="/accounts/new" element={<AccountForm />} />
+          <Route path="/accounts/:id/edit" element={<AccountForm />} />
         </Route>
         {/* Appointments is facility-scoped (409 without a current facility),
             so these sit inside RequireFacility. */}

@@ -1,29 +1,39 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { ApiError, post } from '../../api/client'
+import { useLocation, useNavigate, useParams } from 'react-router'
+import { ApiError, patch, post } from '../../api/client'
 import { useToast } from '../../context/useToast.js'
 
-// Create only -- no PATCH /api/v1/users/:id exists, unlike every other
-// *Form.jsx in this app, so there's no edit mode to branch on here.
+// Shared create/edit, same router-state pattern as every other *Form.jsx
+// (no GET /api/v1/users/:id, only the org-wide index -- AccountList's edit
+// <Link state={{ account }}> carries the record in).
 //
-// Also missing: any way to set a new user's facility memberships. Django's
-// UserForm has a `facilities` checkbox list (org-scoped), but POST
-// /api/v1/users' body only accepts email/password/first_name/last_name/
-// role -- no facilities field at all. A doctor/receptionist created
-// through this screen will have zero accessible_facilities (org_admin is
-// the one role that doesn't need explicit membership -- see brief §4) and
-// won't be able to do anything facility-scoped until that's fixed
-// server-side. Flagged in CLAUDE.md, not silently worked around.
+// Edit is deliberately narrower than create: PATCH /api/v1/users/:id only
+// accepts first_name/last_name/role (added 2026-08-29, closing the gap
+// this file used to flag) -- email is the login identifier and password
+// goes through the reset flow, neither editable here. Shown read-only in
+// edit mode rather than omitted, so the admin can still see which account
+// they're on.
+//
+// Still missing, unrelated to the fix above: no way to set a user's
+// facility memberships anywhere, create or edit -- Django's UserForm has a
+// `facilities` checkbox list; neither POST nor PATCH /api/v1/users accepts
+// one. A doctor/receptionist still gets zero accessible_facilities with
+// no fix available client or server side. Still flagged in CLAUDE.md.
 function AccountForm() {
+  const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { addToast } = useToast()
 
+  const isEditing = Boolean(id)
+  const existingAccount = location.state?.account
+
   const [formData, setFormData] = useState({
-    email: '',
+    email: existingAccount?.email || '',
     password: '',
-    first_name: '',
-    last_name: '',
-    role: 'receptionist',
+    first_name: existingAccount?.first_name || '',
+    last_name: existingAccount?.last_name || '',
+    role: existingAccount?.role || 'receptionist',
   })
   const [errors, setErrors] = useState([])
 
@@ -35,9 +45,21 @@ function AccountForm() {
     event.preventDefault()
     setErrors([])
 
+    const body = isEditing
+      ? { user: { first_name: formData.first_name, last_name: formData.last_name, role: formData.role } }
+      : { user: formData }
+
     try {
-      const data = await post('/api/v1/users', { user: formData })
-      addToast(`Account for ${data.user.email} created successfully.`, 'success')
+      const data = isEditing
+        ? await patch(`/api/v1/users/${id}`, body)
+        : await post('/api/v1/users', body)
+
+      addToast(
+        isEditing
+          ? `Account for ${data.user.email} updated.`
+          : `Account for ${data.user.email} created successfully.`,
+        'success',
+      )
       navigate('/accounts')
     } catch (err) {
       setErrors(err instanceof ApiError ? err.errors || [err.message] : ['Something went wrong'])
@@ -46,7 +68,7 @@ function AccountForm() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Add Account</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{isEditing ? 'Edit' : 'Add'} Account</h1>
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow space-y-4">
         {errors.length > 0 && (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -55,28 +77,37 @@ function AccountForm() {
             ))}
           </div>
         )}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            required
-          />
-        </div>
+        {isEditing ? (
+          <div>
+            <span className="block text-sm font-medium text-gray-700">Email</span>
+            <p className="mt-1 text-gray-900">{formData.email}</p>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                required
+              />
+            </div>
+          </>
+        )}
         <div>
           <label className="block text-sm font-medium text-gray-700">First name</label>
           <input

@@ -527,14 +527,19 @@ Admissions only) — an explicit, separately-requested extension.
   field), edit reads the record from router `state` same as every other `*Form.jsx` in this app (no
   `GET /api/v1/facilities/:id` exists). No delete affordance (API has none, consistent with every
   other resource).
-- **`src/pages/accounts/{AccountList,AccountForm}.jsx`**: list readable by any role, Add gated to
-  org_admin. **`AccountForm` is create-only** — confirmed against the live Rails contract (re-
-  grepped fresh, not trusted from an earlier read) that `PATCH /api/v1/users/:id` does not exist at
-  all, only `GET`/`POST /api/v1/users`. This is a real, deliberate divergence from Django (which has
-  full user edit) — no edit route/link was built, rather than faking one that would only 404.
+- **`src/pages/accounts/{AccountList,AccountForm}.jsx`**: list readable by any role, Add/Edit
+  gated to org_admin. **Edit added 2026-08-29** once the Rails session shipped
+  `PATCH /api/v1/users/:id` (prompted below) — re-confirmed the exact accepted shape fresh before
+  building rather than assuming it matched `POST`: **narrower** than create, only
+  `first_name`/`last_name`/`role` accepted (`email`/`password`/`organization_id` silently
+  dropped if sent). `AccountForm` shows email read-only in edit mode (a `<p>`, not an `<input>`)
+  rather than omitting it, so the admin can still see which account they're on; no password field
+  in edit mode at all, since the API has nowhere for it to go. Same router-`state` hand-off pattern
+  as every other `*Form.jsx` (`AccountList`'s edit `<Link state={{ account }}>`).
 - **`src/components/RequireOrgAdmin.jsx`**: new guard, same shape as `RequireFacility` — checks
   `currentUser.role === 'org_admin'`, `<Navigate to="/" replace />` otherwise. Wraps only the
-  create/edit routes (`/facilities/new`, `/facilities/:id/edit`, `/accounts/new`); the list routes
+  create/edit routes (`/facilities/new`, `/facilities/:id/edit`, `/accounts/new`,
+  `/accounts/:id/edit`); the list routes
   stay open to any role, matching `GET /api/v1/facilities`/`GET /api/v1/users`' any-role read scope
   and Django's identical `LoginRequiredMixin`-only `ListView`s. Real enforcement is still
   server-side (`403` on the same actions for a non-org_admin) — this only avoids showing a
@@ -559,18 +564,21 @@ Admissions only) — an explicit, separately-requested extension.
   > only `org_admin` (which doesn't need explicit membership) works end-to-end. Please add either
   > a `facility_ids` array accepted directly in `POST`/`PATCH /api/v1/users`' body, or a dedicated
   > endpoint (e.g. `POST /api/v1/users/:id/facility_memberships`) for setting them after creation —
-  > whichever fits the existing `FacilityMembership` join model better. Also worth adding while
-  > there: `PATCH /api/v1/users/:id` doesn't exist at all yet (only `GET`/`POST`), so there's
-  > currently no way to edit an existing user's name/role/email either — the SPA's Accounts screen
-  > has no edit affordance at all as a result.
+  > whichever fits the existing `FacilityMembership` join model better.
+
+  **Update 2026-08-29: the second half of this prompt (missing `PATCH /api/v1/users/:id`) was
+  fixed same-day** — the Rails session shipped it deliberately narrower than `POST` (only
+  `first_name`/`last_name`/`role`), and the SPA's Accounts screen now has a working Edit. Only the
+  facility-membership half above is still open.
 
 - **Verified end-to-end in a real browser**: created a real Facility (toast copy matches Django
   exactly), edited it (pre-filled correctly from router state), created a real user account (toast
-  fired, appeared in the list with its role), and confirmed the org_admin guard as described above.
-  Lint and `vite build` both clean throughout.
+  fired, appeared in the list with its role), confirmed the org_admin guard as described above, and
+  — once the edit endpoint landed — edited an existing account's role (`receptionist` → `doctor`),
+  confirmed the toast and the list updating live. Lint and `vite build` both clean throughout.
 
 **Still open**: the list/form error-UI gap (no visible message for a generic fetch failure on
 mount-time loads, separate from the toast work above and from the inline-error/toast split — a
 network/500 failure still just leaves a screen stuck loading or empty); the user-facility-
-membership and user-edit gaps just above (worth raising with the Rails session); checkpoint 8
-(testing).
+membership gap just above (worth raising with the Rails session — the prompt is ready to paste);
+checkpoint 8 (testing).
