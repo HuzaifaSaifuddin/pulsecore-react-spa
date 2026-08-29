@@ -314,9 +314,61 @@ booking is built. No delete affordance (API has none — see contract note above
 routing exercises, never real screens) removed; nav now links Home/Patients, with
 Appointments/Admissions to be added once those routes exist. Lint and `vite build` both clean.
 
-**Still open for checkpoint 6**: Appointments and Admissions — two-step booking flow (patient
-search → booking form, facility fixed) and the list+detail split-pane (status tabs, date
-navigator, URL-driven selected item) — both new-concept, hands-on per the build-mode split above.
-Also still open: the checkpoint-5 "known open gap" (mid-session 401 expiry handling in
-`api/client.js`), worth doing before these screens start mutating data.
-  directly before building the API client/each screen; this summary is deliberately condensed.
+**Appointments feature done end-to-end** (2026-08-29): two-step booking (patient search →
+booking form) and the list+detail split-pane, including status actions and notes editing.
+**Scope note**: this one was built directly by Claude, not hands-on — Huzaifa asked to build the
+whole feature after already using the search+form pattern hands-on for Patients; confirmed via
+AskUserQuestion that this meant building the two-step-flow and split-pane pieces too (both
+originally earmarked "genuinely new, hands-on" in the build-mode split above), not just the
+repetitive parts. Logged in [[feedback_show_examples_new_apis]] as an explicit, asked-for
+exception for this one feature — not a standing change to the hybrid split.
+
+Files: `src/pages/appointments/{AppointmentPatientSearch,AppointmentForm,AppointmentList,
+AppointmentDetailPanel}.jsx`, plus two new reusable components pulled forward from checkpoint 7
+(`src/components/{DateNavigator,StatusTabs}.jsx`, both prop-driven, no state of their own) and
+two new utils (`src/utils/date.js` — `toLocalDateString`/`toDatetimeLocalString`, both local-time-
+safe, never `toISOString()` for deriving a calendar date/local timestamp; `src/utils/status.js` —
+`formatStatus`).
+
+- **URL state**: `AppointmentList` keeps `?status=`, `?date=`, `?appointment=` all in the URL.
+  Verified against the real Django templates (not the brief's more general language) that date and
+  status changes each *drop* the current `appointment` selection (a different day/tab has no "same"
+  row selected) — only a row click preserves status+date while setting `appointment`, via
+  `setSearchParams(..., { replace: true })`. Status filtering is a plain client-side `.filter()`
+  over the day's already-fetched list — confirmed via the Rails contract that `GET
+  /api/v1/appointments` has no `?status=` param, only `?date=`, so there's nothing to refetch on a
+  tab switch.
+- **Selected detail survives a status change that filters it out of the table** — deliberate,
+  matches Django's own comment ("if you just advanced an appointment past the tab you're viewing,
+  its detail should stay visible"). Implemented by keeping one `appointments` array (the full,
+  unfiltered day) in state and updating the matching entry in place from each mutation's response;
+  `selectedAppointment` is derived via `.find()` on that same array, never filtered.
+- **Doctor dropdown only scopes to `role === 'doctor'` org-wide**, not to the current facility's
+  doctor members like Django's `User.objects.filter(role=DOCTOR, facilities=facility)` — `GET
+  /api/v1/users` has no per-user facility-membership data to filter on client-side. Real, flagged
+  divergence, not silently matched.
+- **Booking-flow patient hand-off**: search screen's "Book" link carries the full patient via
+  router `state` (same pattern as `PatientList`'s edit link); `AppointmentForm` falls back to
+  fetching the full patients list and finding by id if `state` is missing (e.g. a direct URL visit,
+  no search first) — same "index + client derive" shape as everywhere else, and mirrors Django's
+  `AppointmentCreateView._resolve_patient` redirecting back to search when no patient resolves.
+- **Verified end-to-end in a real browser** against the live Rails API (logged in as a seeded
+  org_admin): booking flow, row selection, status advance (`Mark Arrived`) with the row correctly
+  dropping out of the Scheduled tab while staying visible in the detail panel, status revert, and
+  the server's real "one active appointment per patient per day" conflict rule surfacing correctly
+  as a form error. Lint and `vite build` both clean; no console errors during the manual pass.
+- **Nav brought fully in line with brief §7**: `AuthenticatedLayout` now renders the brand text as
+  the home link (not a separate "Home" item, matching Django exactly), an Appointments link, the
+  facility switcher (`<select>` when `accessibleFacilities.length > 1`, else a read-only badge),
+  and the logged-in user's email — all previously missing since checkpoint 5 stood the nav up with
+  fake placeholder links only.
+- **Known gap, not fixed here**: `setCurrentFacility` (used by the new switcher) still only sets
+  local React state — there is no `PATCH` endpoint on the Rails side to persist a user's chosen
+  `default_facility_id`, so a page refresh silently reverts to whatever's stored server-side. Same
+  class of gap as the checkpoint-5 `/me` endpoint before it was built; worth a similar prompt to the
+  Rails session if this starts causing real confusion.
+
+**Still open for checkpoint 6**: Admissions (mirror of the Appointments build above — same
+components should be directly reusable via props, same file shape). Also still open: the
+checkpoint-5 "known open gap" (mid-session 401 expiry handling in `api/client.js`), worth doing
+before Admissions starts mutating data too.

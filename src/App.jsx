@@ -7,6 +7,9 @@ import Home from './pages/Home'
 import ChooseFacility from './pages/ChooseFacility'
 import PatientList from './pages/patients/PatientList'
 import PatientForm from './pages/patients/PatientForm'
+import AppointmentList from './pages/appointments/AppointmentList'
+import AppointmentPatientSearch from './pages/appointments/AppointmentPatientSearch'
+import AppointmentForm from './pages/appointments/AppointmentForm'
 
 function App() {
   const { checkingSession } = useAuth()
@@ -29,8 +32,14 @@ function App() {
         <Route path="/patients" element={<PatientList />} />
         <Route path="/patients/new" element={<PatientForm />} />
         <Route path="/patients/:id/edit" element={<PatientForm />} />
+        {/* Appointments is facility-scoped (409 without a current facility),
+            so these sit inside RequireFacility. */}
         <Route element={<RequireFacility />}>
           <Route path="/" element={<Home />} />
+          <Route path="/appointments" element={<AppointmentList />} />
+          <Route path="/appointments/search" element={<AppointmentPatientSearch />} />
+          <Route path="/appointments/new" element={<AppointmentForm />} />
+          <Route path="/appointments/:id/edit" element={<AppointmentForm />} />
         </Route>
       </Route>
     </Routes>
