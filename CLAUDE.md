@@ -600,6 +600,80 @@ Clean console throughout.
 
 **Still open**: the list/form error-UI gap (no visible message for a generic fetch failure on
 mount-time loads, separate from the toast work above and from the inline-error/toast split — a
-network/500 failure still just leaves a screen stuck loading or empty); checkpoint 8 (testing) —
-the only thing left from the original curriculum now that every real cross-repo gap this project
-surfaced has either been fixed or is a documented, deliberate divergence.
+network/500 failure still just leaves a screen stuck loading or empty).
+
+## Checkpoint 8: Testing (Vitest + React Testing Library) — done (2026-08-29)
+
+Built directly per Huzaifa's request ("write test cases... let me know once done"), scoped exactly
+to the curriculum note above: component tests for the shared UI kit, integration-style tests for
+the two-step booking flow and auth/route-guard behavior. Not a test for every screen in the app —
+deliberately bounded, not scope-crept.
+
+**Setup**: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-
+event`, `jsdom` (devDependencies only — none of this ships in the production build). `vite.config.js`
+gains a `test` block (`environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`) — Vitest reuses
+the same Vite config already handling the real app, no separate build tool. `package.json` gains
+`test` (`vitest run`, single pass — CI-shaped) and `test:watch` (`vitest`, interactive). Deliberately
+**not** using Vitest's `globals: true` — every test file explicitly imports `describe`/`it`/
+`expect`/`vi` from `'vitest'` instead of relying on injected globals, so ESLint's existing config
+(`eslint.config.js`) needs no test-specific global additions at all.
+
+**Three real, non-obvious bugs hit and fixed while setting this up, not just "install and go"**:
+- **`@testing-library/jest-dom`'s plain import assumes a global `expect`** (Jest's default) — threw
+  `ReferenceError: expect is not defined` immediately, since this project deliberately skips
+  `globals: true`. Fixed with the `/vitest` subpath import (`@testing-library/jest-dom/vitest`),
+  which wires into Vitest's own `expect` instance directly instead of assuming a global one exists.
+- **No cleanup between tests, DOM silently piling up across a whole file.** React Testing Library
+  auto-registers its own `afterEach(cleanup)` — but only when it detects Jest's global `afterEach`,
+  which (again) this project's non-`globals` setup doesn't provide. Every `render()` within a file
+  was appending into `document.body` without ever clearing the previous test's output, so by the
+  third test in a file, queries like `getByText('Today')` failed with "found multiple elements" —
+  looked like a broken component at first glance, was actually a test-harness gap. Fixed with an
+  explicit `afterEach(() => cleanup())` in `src/test/setup.js`.
+- **A fake-timer-advanced state update needs `act()` to flush before the next assertion.**
+  `ToastStack`'s auto-dismiss test (`vi.useFakeTimers()` + `vi.advanceTimersByTime(4000)`) failed
+  even though the underlying `setTimeout(() => removeToast(id), 4000)` logic is correct — the timer
+  callback's `setState` fires outside any React-managed event, so without wrapping the timer-advance
+  in `act(() => { vi.advanceTimersByTime(4000) })`, the DOM update isn't guaranteed to have flushed
+  by the time the assertion runs immediately after. Same underlying idea as `set-state-in-effect`
+  false positives logged earlier in this file (React's own scheduling not being obviously
+  synchronous), different manifestation.
+
+**Component tests** (`src/components/*.test.jsx`): `DateNavigator` (prev/next/today all call
+`onChange` with the right date; "Today" highlighted only when the selected date actually is today),
+`StatusTabs` (renders every tab, active-tab styling, `onChange` fires with the clicked value),
+`ToastStack` (renders nothing with zero toasts; a triggered toast is styled by type; manual dismiss;
+the auto-dismiss timing bug above).
+
+**Route-guard integration tests** (the curriculum's explicit "redirect when no session / no current
+facility"): `RequireFacility` (redirects to `/choose-facility?next=<original path>` — asserted via a
+location-echoing test route, not just "some redirect happened" — when `currentFacility` is `null`;
+renders its protected route otherwise), `RequireOrgAdmin` (redirects a non-admin role, and a
+logged-out user, to `/`; renders for `org_admin`), `AuthenticatedLayout` (redirects to `/login` when
+`isLoggedIn` is false — the "no session" case named in the curriculum note — and renders nav +
+protected content otherwise). All three mock `useAuth`/`useToast` wholesale via `vi.mock(...)`
+rather than standing up a real `AuthProvider` (which would need `GET /api/v1/me` mocked at the fetch
+layer too) — appropriate for a guard component that only ever calls the hook, not for anything
+doing real data-fetching itself.
+
+**Two-step booking flow integration test** (`AppointmentPatientSearch.test.jsx`): mocks
+`../../api/client` wholesale (this step is about the client-side filtering and the handoff into
+step two, not the real network call) — confirms results stay empty until a search actually runs,
+name-filters the mocked org-wide patient list correctly, shows "No matching patients." on a miss,
+and — the actual handoff being tested — the "Book" link's `href` carries `?patient=<id>` into step
+two, plus the inline "register new patient" link's `?next=` round-trip target.
+
+**Verified for real, not just "wrote and assumed"**: `npm test` — 26 tests, 7 files, all passing;
+`npm run lint` and `npm run build` both stay clean with the new test files and devDependencies in
+place (Vite's build doesn't pull in `*.test.jsx` files at all, since nothing in the real app imports
+them).
+
+**Not covered, deliberately** (matches the curriculum note's actual scope, not an oversight):
+per-screen tests for every CRUD form (Patients/Appointments/Admissions/Facilities/Accounts) —
+already covered by the extensive real-browser verification during each feature's own build: this
+suite is about the shared/reusable pieces and the two named integration scenarios, not full
+coverage of the whole app.
+
+That's every item from the original curriculum now done — checkpoints 1 through 8, plus the
+admin-management screens added along the way. What remains from the curriculum is checkpoint 9
+(deployment) and the still-open list/form error-UI gap noted above.
