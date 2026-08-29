@@ -517,6 +517,60 @@ the flash/toast stack next and let me know once done").
   exact brief-specified class string as the already-confirmed green case, low marginal value versus
   contriving a race condition to reach it.
 
+**Facilities/Accounts (admin management screens) done** (2026-08-29), built directly per Huzaifa's
+request ("work through Facility/Users List/Add/Edit View for Admin similar to Django
+implementation"). Not part of the original checkpoint 6 curriculum (Patients/Appointments/
+Admissions only) — an explicit, separately-requested extension.
+
+- **`src/pages/facilities/{FacilityList,FacilityForm}.jsx`**: full parity with Django —
+  list readable by any role, Add/Edit gated to org_admin, shared create/edit form (single `name`
+  field), edit reads the record from router `state` same as every other `*Form.jsx` in this app (no
+  `GET /api/v1/facilities/:id` exists). No delete affordance (API has none, consistent with every
+  other resource).
+- **`src/pages/accounts/{AccountList,AccountForm}.jsx`**: list readable by any role, Add gated to
+  org_admin. **`AccountForm` is create-only** — confirmed against the live Rails contract (re-
+  grepped fresh, not trusted from an earlier read) that `PATCH /api/v1/users/:id` does not exist at
+  all, only `GET`/`POST /api/v1/users`. This is a real, deliberate divergence from Django (which has
+  full user edit) — no edit route/link was built, rather than faking one that would only 404.
+- **`src/components/RequireOrgAdmin.jsx`**: new guard, same shape as `RequireFacility` — checks
+  `currentUser.role === 'org_admin'`, `<Navigate to="/" replace />` otherwise. Wraps only the
+  create/edit routes (`/facilities/new`, `/facilities/:id/edit`, `/accounts/new`); the list routes
+  stay open to any role, matching `GET /api/v1/facilities`/`GET /api/v1/users`' any-role read scope
+  and Django's identical `LoginRequiredMixin`-only `ListView`s. Real enforcement is still
+  server-side (`403` on the same actions for a non-org_admin) — this only avoids showing a
+  create/edit form that would just fail on submit for the wrong role. **Verified in a real
+  browser**: logged in as a seeded receptionist, confirmed Accounts/Facilities are absent from
+  nav, then navigated directly to `/facilities/new` by URL — bounced straight back to `/`.
+- **Real, more significant gap caught while building the form, not glossed over**: Django's
+  `UserForm` has a `facilities` checkbox list (org-scoped) so an org_admin can assign a new
+  non-admin user's facility memberships at creation time. `POST /api/v1/users`'s body has **no such
+  field at all** — only `email`/`password`/`first_name`/`last_name`/`role`. A doctor or
+  receptionist created through this screen today gets **zero `accessible_facilities`** (org_admin
+  is the one role that doesn't need explicit membership — brief §4) and can't do anything
+  facility-scoped until membership is set some other way — there is currently no other way,
+  client or server. `AccountForm.jsx` still built and works for the fields the API does accept
+  (matches Rails' actual contract, not Django's), but this is a real product gap worth a prompt to
+  the Rails session:
+
+  > `POST /api/v1/users` has no way to set a new user's facility memberships — Django's reference
+  > `UserForm` has a `facilities` checkbox list (`ModelMultipleChoiceField`, org-scoped) that this
+  > API has no equivalent for. A doctor/receptionist created today has zero
+  > `accessible_facilities` and can't be assigned to any facility at all, client or server side —
+  > only `org_admin` (which doesn't need explicit membership) works end-to-end. Please add either
+  > a `facility_ids` array accepted directly in `POST`/`PATCH /api/v1/users`' body, or a dedicated
+  > endpoint (e.g. `POST /api/v1/users/:id/facility_memberships`) for setting them after creation —
+  > whichever fits the existing `FacilityMembership` join model better. Also worth adding while
+  > there: `PATCH /api/v1/users/:id` doesn't exist at all yet (only `GET`/`POST`), so there's
+  > currently no way to edit an existing user's name/role/email either — the SPA's Accounts screen
+  > has no edit affordance at all as a result.
+
+- **Verified end-to-end in a real browser**: created a real Facility (toast copy matches Django
+  exactly), edited it (pre-filled correctly from router state), created a real user account (toast
+  fired, appeared in the list with its role), and confirmed the org_admin guard as described above.
+  Lint and `vite build` both clean throughout.
+
 **Still open**: the list/form error-UI gap (no visible message for a generic fetch failure on
 mount-time loads, separate from the toast work above and from the inline-error/toast split — a
-network/500 failure still just leaves a screen stuck loading or empty); checkpoint 8 (testing).
+network/500 failure still just leaves a screen stuck loading or empty); the user-facility-
+membership and user-edit gaps just above (worth raising with the Rails session); checkpoint 8
+(testing).

@@ -13,6 +13,11 @@ import AppointmentForm from './pages/appointments/AppointmentForm'
 import AdmissionList from './pages/admissions/AdmissionList'
 import AdmissionPatientSearch from './pages/admissions/AdmissionPatientSearch'
 import AdmissionForm from './pages/admissions/AdmissionForm'
+import FacilityList from './pages/facilities/FacilityList'
+import FacilityForm from './pages/facilities/FacilityForm'
+import AccountList from './pages/accounts/AccountList'
+import AccountForm from './pages/accounts/AccountForm'
+import RequireOrgAdmin from './components/RequireOrgAdmin'
 
 function App() {
   const { checkingSession } = useAuth()
@@ -35,6 +40,15 @@ function App() {
         <Route path="/patients" element={<PatientList />} />
         <Route path="/patients/new" element={<PatientForm />} />
         <Route path="/patients/:id/edit" element={<PatientForm />} />
+        {/* Facilities/Accounts are also org-scoped, list readable by any
+            role -- only the create/edit routes are org_admin-only. */}
+        <Route path="/facilities" element={<FacilityList />} />
+        <Route path="/accounts" element={<AccountList />} />
+        <Route element={<RequireOrgAdmin />}>
+          <Route path="/facilities/new" element={<FacilityForm />} />
+          <Route path="/facilities/:id/edit" element={<FacilityForm />} />
+          <Route path="/accounts/new" element={<AccountForm />} />
+        </Route>
         {/* Appointments is facility-scoped (409 without a current facility),
             so these sit inside RequireFacility. */}
         <Route element={<RequireFacility />}>

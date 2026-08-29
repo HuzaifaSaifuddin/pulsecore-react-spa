@@ -32,6 +32,16 @@ function AuthenticatedLayout() {
             <Link to="/patients" className="text-gray-700 hover:text-blue-600">
               Patients
             </Link>
+            {currentUser?.role === 'org_admin' && (
+              <>
+                <Link to="/accounts" className="text-gray-700 hover:text-blue-600">
+                  Accounts
+                </Link>
+                <Link to="/facilities" className="text-gray-700 hover:text-blue-600">
+                  Facilities
+                </Link>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-4 text-sm">
