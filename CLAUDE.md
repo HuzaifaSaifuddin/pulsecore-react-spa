@@ -166,6 +166,13 @@ screens for these."
   guard route (no UI, just `Outlet` or `<Navigate>`) with a separate nav-rendering shell nested
   inside it lets a route require auth *without* inheriting chrome it shouldn't have (e.g. a
   standalone "choose your facility" step that needs login but not the top nav).
+- **One object in `useState` scales a form better than one `useState` per field** (checkpoint 6,
+  `PatientForm`). State must always be *replaced*, never mutated, so a single `handleChange` needs
+  the spread operator (`{ ...formData, [key]: value }`) to copy every untouched field into the new
+  object before overwriting just the one that changed. The `[event.target.name]` part is a
+  *computed property key* — whatever string is in the input's `name` attribute becomes the object
+  key that gets written — which is what lets one handler serve every field instead of one handler
+  per field. Every input needs a matching `name` now, since that's the wiring the handler reads.
 
 ## Progress
 
