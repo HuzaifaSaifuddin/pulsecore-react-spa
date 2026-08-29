@@ -577,8 +577,29 @@ Admissions only) — an explicit, separately-requested extension.
   — once the edit endpoint landed — edited an existing account's role (`receptionist` → `doctor`),
   confirmed the toast and the list updating live. Lint and `vite build` both clean throughout.
 
+**Facility-membership gap closed** (2026-08-29, same day) — the Rails session shipped
+`facility_ids` on both `POST` and `PATCH /api/v1/users`. Re-pulled the exact accepted shape fresh
+before building (not assumed from the prompt that requested it): `facility_ids` is optional, ids
+outside the caller's org are silently dropped, and there's a real behavioral nuance worth knowing
+— **assigning exactly one auto-sets it as the user's `default_facility`**; zero or several leaves
+it unset. On `PATCH` specifically the key is only touched when present in the body (omit to leave
+memberships alone, send `[]` to clear them) — moot for this form since it always renders/submits
+the full checkbox list once loaded, but worth remembering if this endpoint is ever called from
+somewhere that deliberately omits the field.
+
+`AccountForm.jsx` gained a `facilities` checkbox list (fetched via `GET /api/v1/facilities`, same
+`useEffect`-on-mount shape as `AppointmentForm`'s doctor dropdown), a dedicated `toggleFacility`
+handler (add/remove from the `facility_ids` array — a new state-update shape not used elsewhere in
+this app, `formData.facility_ids` needing a functional `setFormData(prev => ...)` update since the
+next array depends on the previous one, unlike every other field here which just overwrites by
+key) and a helper line surfacing the default-facility auto-set behavior. **Verified end-to-end in a
+real browser**: created an account with exactly one facility checked, confirmed the success toast,
+then reopened it via Edit and confirmed the checkbox round-tripped correctly from the freshly
+fetched `facility_ids` — real create → real read → real edit-form-prefill, not just the create leg.
+Clean console throughout.
+
 **Still open**: the list/form error-UI gap (no visible message for a generic fetch failure on
 mount-time loads, separate from the toast work above and from the inline-error/toast split — a
-network/500 failure still just leaves a screen stuck loading or empty); the user-facility-
-membership gap just above (worth raising with the Rails session — the prompt is ready to paste);
-checkpoint 8 (testing).
+network/500 failure still just leaves a screen stuck loading or empty); checkpoint 8 (testing) —
+the only thing left from the original curriculum now that every real cross-repo gap this project
+surfaced has either been fixed or is a documented, deliberate divergence.

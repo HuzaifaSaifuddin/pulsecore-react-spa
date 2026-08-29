@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { ApiError, patch, post } from '../../api/client'
+import { ApiError, get, patch, post } from '../../api/client'
 import { useToast } from '../../context/useToast.js'
 
 // Shared create/edit, same router-state pattern as every other *Form.jsx
@@ -8,17 +8,19 @@ import { useToast } from '../../context/useToast.js'
 // <Link state={{ account }}> carries the record in).
 //
 // Edit is deliberately narrower than create: PATCH /api/v1/users/:id only
-// accepts first_name/last_name/role (added 2026-08-29, closing the gap
-// this file used to flag) -- email is the login identifier and password
-// goes through the reset flow, neither editable here. Shown read-only in
-// edit mode rather than omitted, so the admin can still see which account
-// they're on.
+// accepts first_name/last_name/role/facility_ids -- email is the login
+// identifier and password goes through the reset flow, neither editable
+// here. Shown read-only in edit mode rather than omitted, so the admin can
+// still see which account they're on.
 //
-// Still missing, unrelated to the fix above: no way to set a user's
-// facility memberships anywhere, create or edit -- Django's UserForm has a
-// `facilities` checkbox list; neither POST nor PATCH /api/v1/users accepts
-// one. A doctor/receptionist still gets zero accessible_facilities with
-// no fix available client or server side. Still flagged in CLAUDE.md.
+// facility_ids (added 2026-08-29, closing the gap this file used to flag)
+// is a real behavioral nuance, not just "send an array": assigning exactly
+// one auto-sets that as the user's default_facility; zero or several
+// leaves it unset (they pick on login). On edit specifically, the key is
+// only touched when present -- since this form always renders/submits the
+// checkbox list once loaded, that's a non-issue here, but worth knowing if
+// this endpoint is ever called from somewhere that omits the field on
+// purpose.
 function AccountForm() {
   const { id } = useParams()
   const location = useLocation()
@@ -28,17 +30,41 @@ function AccountForm() {
   const isEditing = Boolean(id)
   const existingAccount = location.state?.account
 
+  const [facilities, setFacilities] = useState([])
   const [formData, setFormData] = useState({
     email: existingAccount?.email || '',
     password: '',
     first_name: existingAccount?.first_name || '',
     last_name: existingAccount?.last_name || '',
     role: existingAccount?.role || 'receptionist',
+    facility_ids: existingAccount?.facility_ids || [],
   })
   const [errors, setErrors] = useState([])
 
+  useEffect(() => {
+    async function loadFacilities() {
+      try {
+        const data = await get('/api/v1/facilities')
+        setFacilities(data.facilities)
+      } catch {
+        // A 401 is already handled globally; any other failure just leaves
+        // the checkbox list empty rather than crashing the form.
+      }
+    }
+    loadFacilities()
+  }, [])
+
   function handleChange(event) {
     setFormData({ ...formData, [event.target.name]: event.target.value })
+  }
+
+  function toggleFacility(facilityId) {
+    setFormData((previous) => ({
+      ...previous,
+      facility_ids: previous.facility_ids.includes(facilityId)
+        ? previous.facility_ids.filter((id) => id !== facilityId)
+        : [...previous.facility_ids, facilityId],
+    }))
   }
 
   async function handleSubmit(event) {
@@ -46,7 +72,14 @@ function AccountForm() {
     setErrors([])
 
     const body = isEditing
-      ? { user: { first_name: formData.first_name, last_name: formData.last_name, role: formData.role } }
+      ? {
+          user: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            role: formData.role,
+            facility_ids: formData.facility_ids,
+          },
+        }
       : { user: formData }
 
     try {
@@ -140,6 +173,24 @@ function AccountForm() {
             <option value="doctor">Doctor</option>
             <option value="receptionist">Receptionist</option>
           </select>
+        </div>
+        <div>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Facilities</span>
+          <div className="space-y-1">
+            {facilities.map((facility) => (
+              <label key={facility.id} className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={formData.facility_ids.includes(facility.id)}
+                  onChange={() => toggleFacility(facility.id)}
+                />
+                {facility.name}
+              </label>
+            ))}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Assigning exactly one facility sets it as this user&rsquo;s default.
+          </p>
         </div>
         <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
           Save
